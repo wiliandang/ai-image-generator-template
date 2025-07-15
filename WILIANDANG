@@ -148,7 +148,63 @@ export default async function handler(req, res) {
   }));
 
   return res.status(200).json({ images });
-}vercel.json {
+}
+{
+  "name": "ai-image-generator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.1.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "formidable": "^3.5.0"
+  }
+}
+import formidable from 'formidable';
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+const readFile = (req) =>
+  new Promise((resolve, reject) => {
+    const form = formidable({ multiples: false });
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      resolve(files.image);
+    });
+  });
+
+const simulateCaption = (filename) => {
+  const captions = [
+    'Seorang wanita duduk santai di sofa dengan cahaya alami dari jendela.',
+    'Pemandangan alam dengan pohon rindang dan sinar matahari.',
+    'Ilustrasi kota futuristik dengan nuansa cyberpunk.',
+    'Interior rumah minimalis dengan pencahayaan hangat.',
+  ];
+  return captions[Math.floor(Math.random() * captions.length)];
+};
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  try {
+    const file = await readFile(req);
+    const caption = simulateCaption(file.originalFilename);
+    return res.status(200).json({ caption });
+  } catch (err) {
+    console.error('Error:', err);
+    return res.status(500).json({ error: 'Gagal membaca gambar' });
+  }
+}
+{
   "functions": {
     "api/describe-image.js": {
       "maxDuration": 30
