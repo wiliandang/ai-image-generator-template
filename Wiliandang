@@ -1,0 +1,158 @@
+"use client";
+
+import React, { useState } from 'react';
+
+export default function App() {
+  const [prompt, setPrompt] = useState('');
+  const [style, setStyle] = useState('Realistic');
+  const [ratio, setRatio] = useState('4:3');
+  const [quality, setQuality] = useState('High');
+  const [images, setImages] = useState([]);
+  const [refImage, setRefImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const styles = ['Realistic', 'Anime', 'Cyberpunk', 'Portrait', 'Illustration'];
+  const ratios = ['1:1', '4:3', '3:4', '16:9', '9:16'];
+  const qualities = ['Low', 'Medium', 'High', 'Ultra'];
+
+  const generateImages = async () => {
+    setLoading(true);
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, style, ratio, quality, refImage }),
+    });
+    const data = await response.json();
+    setImages(data.images);
+    setLoading(false);
+  };
+
+  const handleRefImageUpload = async (e) => {
+    const file = e.target.files[0];
+    setRefImage(URL.createObjectURL(file));
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const res = await fetch('/api/describe-image', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    setPrompt(data.caption);
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-4 max-w-screen-xl mx-auto space-y-6 bg-white text-black">
+      <h1 className="text-3xl font-bold">AI Gambar Generator v3.0</h1>
+
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Deskripsikan gambar yang ingin Anda buat..."
+        className="w-full min-h-[100px] border border-gray-300 rounded p-2"
+      />
+
+      <div className="flex items-center gap-4">
+        <input type="file" accept="image/*" onChange={handleRefImageUpload} />
+        {refImage && <img src={refImage} alt="referensi" className="h-20 rounded-xl shadow-md" />}
+        {loading && <span className="text-blue-500 animate-pulse">Menganalisis gambar referensi...</span>}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <select value={style} onChange={(e) => setStyle(e.target.value)} className="border p-2 rounded">
+          {styles.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={ratio} onChange={(e) => setRatio(e.target.value)} className="border p-2 rounded">
+          {ratios.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select value={quality} onChange={(e) => setQuality(e.target.value)} className="border p-2 rounded">
+          {qualities.map((q) => <option key={q} value={q}>{q}</option>)}
+        </select>
+      </div>
+
+      <button onClick={generateImages} disabled={loading || !prompt} className="bg-blue-600 text-white px-4 py-2 rounded">
+        {loading ? 'Menghasilkan...' : 'Generate Gambar AI'}
+      </button>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        {images.map((img, i) => (
+          <div key={i} className="relative group overflow-hidden border rounded-xl">
+            <img src={img.url} alt={`hasil-${i}`} className="w-full h-auto rounded-xl" />
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all text-white flex items-center justify-center text-sm p-2 text-center">
+              <div>
+                <p>Rasio: {img.ratio}</p>
+                <p>Gaya: {img.style}</p>
+                <p>Model: Imagen 3.0</p>
+                <p>Waktu: {img.timestamp}</p>
+                <a href={img.url} download className="underline mt-2 block">Unduh</a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+import formidable from 'formidable';
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+const readFile = (req) =>
+  new Promise((resolve, reject) => {
+    const form = formidable({ multiples: false });
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      resolve(files.image);
+    });
+  });
+
+const simulateCaption = (filename) => {
+  const captions = [
+    'Seorang wanita duduk santai di sofa dengan cahaya alami dari jendela.',
+    'Pemandangan alam dengan pohon rindang dan sinar matahari.',
+    'Ilustrasi kota futuristik dengan nuansa cyberpunk.',
+    'Interior rumah minimalis dengan pencahayaan hangat.',
+  ];
+  return captions[Math.floor(Math.random() * captions.length)];
+};
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  try {
+    const file = await readFile(req);
+    const caption = simulateCaption(file.originalFilename);
+    return res.status(200).json({ caption });
+  } catch (err) {
+    console.error('Error:', err);
+    return res.status(500).json({ error: 'Gagal membaca gambar' });
+  }
+}
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { prompt, style, ratio, quality } = JSON.parse(req.body);
+  const dummyImageURL = 'https://picsum.photos/seed/' + encodeURIComponent(prompt) + '/512/512';
+
+  const images = Array.from({ length: 4 }).map((_, i) => ({
+    url: `${dummyImageURL}?v=${i}`,
+    ratio,
+    style,
+    model: 'Imagen 3.0',
+    timestamp: new Date().toLocaleString(),
+  }));
+
+  return res.status(200).json({ images });
+}
+vercel.json {
+  "functions": {
+    "api/describe-image.js": {
+      "maxDuration": 30
+    }
+  }
+}
