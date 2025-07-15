@@ -148,8 +148,7 @@ export default async function handler(req, res) {
   }));
 
   return res.status(200).json({ images });
-}
-vercel.json {
+}vercel.json {
   "functions": {
     "api/describe-image.js": {
       "maxDuration": 30
